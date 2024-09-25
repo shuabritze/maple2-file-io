@@ -4,4 +4,4 @@ MapleStory2 M2D Reader
 
 ## Credits
 
-Ochi for the original implementation in C#
+Ochi & Eric for the original implementations in C#
