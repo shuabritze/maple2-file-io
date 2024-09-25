@@ -32,7 +32,7 @@ export class PackFileHeaderVer2 implements IPackFileHeader {
     offset: bigint,
     data: BinaryBuffer
   ): PackFileHeaderVer2 {
-    const [size, compressedSize, encodedSize] = CryptoManager.encrypt(
+    const [_, size, compressedSize, encodedSize] = CryptoManager.encrypt(
       PackVersion.NS2F,
       data,
       dwFlag
@@ -42,8 +42,8 @@ export class PackFileHeaderVer2 implements IPackFileHeader {
     header.bufferFlag = dwFlag;
     header.fileIndex = index;
     header.encodedFileSize = encodedSize;
-    header.compressedFileSize = compressedSize ?? 0n;
-    header.fileSize = size ?? 0n;
+    header.compressedFileSize = BigInt(compressedSize) ?? 0n;
+    header.fileSize = BigInt(size) ?? 0n;
     header.offset = offset ?? 0n;
     return header;
   }

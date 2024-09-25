@@ -47,7 +47,7 @@ export class PackFileEntry {
   }
 
   toString(): string {
-    return this.hash
+    return !this.hash
       ? `${this.index},${this.name}\r\n`
       : `${this.index},${this.hash},${this.name}\r\n`;
   }

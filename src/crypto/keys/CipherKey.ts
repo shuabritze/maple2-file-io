@@ -94,7 +94,7 @@ export class CipherKeys {
   );
   static getKeyAndIV(
     version: PackVersion,
-    keyOffset: bigint
+    keyOffset: number
   ): [BinaryBuffer, BinaryBuffer] {
     let key: MultiArrayResource;
     let iv: MultiArrayResource;
@@ -124,7 +124,7 @@ export class CipherKeys {
     }
     const userKey = new BinaryBuffer(32);
     const ivChain = new BinaryBuffer(16);
-    const offset = Number(keyOffset) & 0x7f;
+    const offset = keyOffset & 0x7f;
 
     for (let i = 0; i < 32; i++) {
       userKey.set(i, key.get(offset).get(i));

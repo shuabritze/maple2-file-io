@@ -22,8 +22,8 @@ export class CryptoManager {
     );
     return this.decrypt(
       stream.version ?? PackVersion.MS2F,
-      stream.encodedHeaderSize ?? 0n,
-      stream.compressedHeaderSize ?? 0n,
+      Number(stream.encodedHeaderSize),
+      Number(stream.compressedHeaderSize),
       new Encryption(Encryption.Aes | Encryption.Zlib),
       src
     );
@@ -45,8 +45,8 @@ export class CryptoManager {
     );
     return this.decrypt(
       stream.version ?? PackVersion.MS2F,
-      stream.encodedDataSize ?? 0n,
-      stream.compressedDataSize ?? 0n,
+      Number(stream.encodedDataSize),
+      Number(stream.compressedDataSize),
       new Encryption(Encryption.Aes | Encryption.Zlib),
       src
     );
@@ -69,8 +69,8 @@ export class CryptoManager {
 
     return this.decrypt(
       pHeader.version ?? PackVersion.MS2F,
-      BigInt(pHeader.encodedFileSize ?? 0),
-      pHeader.compressedFileSize ?? 0n,
+      pHeader.encodedFileSize,
+      Number(pHeader.compressedFileSize),
       pHeader.bufferFlag ?? new Encryption(0),
       src
     );
@@ -78,8 +78,8 @@ export class CryptoManager {
 
   static decrypt(
     version: PackVersion,
-    size: bigint,
-    sizeCompressed: bigint,
+    size: number,
+    sizeCompressed: number,
     flag: Encryption,
     src: BinaryBuffer
   ): BinaryBuffer {
@@ -91,7 +91,7 @@ export class CryptoManager {
       src = BinaryBuffer.fromBuffer(Buffer.from(srcString, "base64"));
 
       const cipher = new AESCipher(key.getBuffer(), iv.getBuffer());
-      cipher.transformBlock(src, 0, Number(size), src, 0);
+      cipher.transformBlock(src, 0, size, src, 0);
     } else if (flag.hasFlag(Encryption.Xor)) {
       src = this.encryptXor(version, src, size, sizeCompressed);
     }
@@ -107,84 +107,76 @@ export class CryptoManager {
     version: PackVersion,
     src: BinaryBuffer,
     flag: Encryption
-  ): [bigint, bigint, number] {
+  ): [BinaryBuffer, number, number, number] {
+    const size = src.length;
     let encrypted: BinaryBuffer;
     if (flag.hasFlag(Encryption.Zlib)) {
-      encrypted = BinaryBuffer.fromBuffer(zlib.gzipSync(src.getBuffer()));
+      encrypted = BinaryBuffer.fromBuffer(zlib.deflateSync(src.getBuffer()));
     } else {
       encrypted = BinaryBuffer.fromBuffer(Buffer.from(src.getBuffer()));
     }
 
-    let size = BigInt(src.length);
-    let sizeCompressed = BigInt(encrypted.length);
+    let sizeCompressed = encrypted.length;
 
     if (flag.hasFlag(Encryption.Aes)) {
       // Get the AES Key/IV for transformation
       const [key, iv] = CipherKeys.getKeyAndIV(version, sizeCompressed);
-      const cipher = crypto.createCipheriv(
-        "aes-256-ctr",
-        key.getBuffer(),
-        iv.getBuffer()
-      );
-      cipher.setAutoPadding(false);
 
-      encrypted = BinaryBuffer.fromBuffer(
-        Buffer.from(cipher.update(encrypted.getBuffer()))
-      );
+      const cipher = new AESCipher(key.getBuffer(), iv.getBuffer());
+      cipher.transformBlock(encrypted, 0, size, encrypted, 0);
 
       // Encode the encrypted data into a base64 encoded string
-      encrypted = BinaryBuffer.fromBuffer(
-        Buffer.from(Buffer.from(encrypted.getBuffer()).toString("base64"))
-      );
+      const stringBase64 = encrypted.getBuffer().toString("base64");
+      encrypted = BinaryBuffer.fromBuffer(Buffer.from(stringBase64));
     } else if (flag.hasFlag(Encryption.Xor)) {
       // Perform XOR block encryption
       encrypted = this.encryptXor(version, encrypted, size, sizeCompressed);
     }
 
-    return [size, sizeCompressed, encrypted.length];
+    return [encrypted, size, sizeCompressed, encrypted.length];
   }
 
   static encryptXor(
     version: PackVersion,
     src: BinaryBuffer,
-    size: bigint,
-    sizeCompressed: bigint
+    size: number,
+    sizeCompressed: number
   ): BinaryBuffer {
     const xorKey = CipherKeys.getXorKey(version);
 
-    let uBlock = size >> 2n;
-    let uBlockOffset = 0n;
-    let nKeyOffset = 0n;
+    let uBlock = size >> 2;
+    let uBlockOffset = 0;
+    let nKeyOffset = 0;
 
-    if (uBlock !== 0n) {
+    if (uBlock !== 0) {
       while (uBlockOffset < uBlock) {
         const pBlockData =
-          src.getBuffer().readBigUInt64LE(4 * Number(uBlockOffset)) ^
-          src.getBuffer().readBigUInt64LE(4 * (Number(uBlockOffset) + 1));
-        src.getBuffer().writeBigUInt64LE(pBlockData, 4 * Number(uBlockOffset));
+          src.getBuffer().readBigUInt64LE(4 * uBlockOffset) ^
+          src.getBuffer().readBigUInt64LE(4 * (uBlockOffset + 1));
+        src.getBuffer().writeBigUInt64LE(pBlockData, 4 * uBlockOffset);
 
-        nKeyOffset = (nKeyOffset + 1n) & 0x1ffn;
+        nKeyOffset = (nKeyOffset + 1) & 0x1ff;
         uBlockOffset++;
       }
     }
 
-    uBlock = size & 3n;
-    if (uBlock !== 0n) {
-      let nStart = 4 * Number(uBlockOffset);
+    uBlock = size & 3;
+    if (uBlock !== 0) {
+      let nStart = 4 * uBlockOffset;
 
-      uBlockOffset = 0n;
-      nKeyOffset = 0n;
+      uBlockOffset = 0;
+      nKeyOffset = 0;
 
       while (uBlockOffset < uBlock) {
         src
           .getBuffer()
           .writeUInt32LE(
-            src.getBuffer().readUInt32LE(nStart + Number(uBlockOffset)) ^
-              xorKey.getBuffer().readUInt32LE(Number(nKeyOffset)),
-            nStart + Number(uBlockOffset)
+            src.getBuffer().readUInt32LE(nStart + uBlockOffset) ^
+              xorKey.getBuffer().readUInt32LE(nKeyOffset),
+            nStart + uBlockOffset
           );
 
-        nKeyOffset = (nKeyOffset + 1n) & 0x7ffn;
+        nKeyOffset = (nKeyOffset + 1) & 0x7ff;
       }
     }
 

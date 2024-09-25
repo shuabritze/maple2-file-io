@@ -9,10 +9,12 @@ import { BinaryBuffer } from "./crypto/common/BinaryBuffer";
 
 export class M2dReader {
   #fileBuffer: Buffer;
+  filePath: string;
 
   readonly files: PackFileEntry[];
 
   constructor(filePath: string) {
+    this.filePath = filePath;
     this.#fileBuffer = fs.readFileSync(filePath);
 
     const headerPath = filePath.replace(".m2d", ".m2h");
