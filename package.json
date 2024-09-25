@@ -1,0 +1,19 @@
+{
+  "name": "maple2-file-io",
+  "version": "1.0.0",
+  "description": "M2D File Reader & Writer",
+  "repository": "https://github.com/shuabritze",
+  "author": "shuabritze",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^14.x",
+    "typescript": "^4.x"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0"
+  }
+}
