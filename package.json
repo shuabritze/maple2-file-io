@@ -5,6 +5,9 @@
   "repository": "https://github.com/shuabritze",
   "author": "shuabritze",
   "license": "MIT",
+  "files": [
+    "dist/**/*"
+  ],
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc"
