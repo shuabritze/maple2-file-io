@@ -8,28 +8,37 @@ import { PackStreamVer1 } from "./crypto/stream/PackStreamVer1";
 
 import fs from "fs";
 import { M2dReader } from "./M2dReader";
+import { PackFileHeaderVer2 } from "./crypto/stream/PackFileHeaderVer2";
+import { PackFileHeaderVer3 } from "./crypto/stream/PackFileHeaderVer3";
 
 export class M2dWriter {
   /**
    * Path to .m2d
    */
   filePath: string;
+  dataBuffer: Buffer;
   files: PackFileEntry[];
 
   constructor(filePath: string) {
     this.filePath = filePath;
+    this.dataBuffer = Buffer.alloc(0);
     this.files = [];
   }
 
   static fromReader(reader: M2dReader) {
     const writer = new M2dWriter(reader.filePath);
     writer.files = reader.files;
-
-    for (const file of reader.files) {
-      file.data = reader.getBytes(file);
-    }
+    writer.dataBuffer = Buffer.from(reader.fileBuffer);
 
     return writer;
+  }
+
+  addEntry(entry: PackFileEntry) {
+    if (!entry.data) {
+      throw new Error("ERROR: Entry data is null.");
+    }
+    entry.changed = true;
+    this.files.push(entry);
   }
 
   save() {
@@ -93,6 +102,7 @@ export class M2dWriter {
     fileStream.write(streamBuffer.getBuffer());
     fileStream.write(encryptedHeaderBuffer.getBuffer());
     fileStream.write(encryptedFileBuffer.getBuffer());
+    fileStream.close();
   }
 
   #writeData() {
@@ -100,115 +110,121 @@ export class M2dWriter {
     let offset = 0n;
     let index = 1;
 
-    const sizeTotal = this.files.reduce(
-      (acc, cur) => acc + (cur.data?.length ?? 0),
-      0
-    );
+    // Allocate space for each new entry & the original data buffer
+    const sizeTotal =
+      this.files
+        .filter((file) => file.changed)
+        .reduce((acc, cur) => {
+          return acc + (cur.data?.length ?? 0) + 48;
+        }, 0) + this.dataBuffer.length;
     const writeBuffer = new BinaryBuffer(sizeTotal);
 
+    let bufferSize = 0;
     for (const packFileEntry of this.files) {
       let header = packFileEntry.fileHeader;
 
-      // TODO: Handle Unchanged
-      //       // If the entry is unchanged, parse the block from the original offsets
+      if (packFileEntry.changed) {
+        if (!header) {
+          // New pack file entry
+          // Hacky way of doing this, but this follows Nexon's current conventions.
+          let dwBufferFlag = new Encryption(0);
+          if (packFileEntry.name.endsWith(".usm")) {
+            dwBufferFlag.value = Encryption.Xor;
+          } else if (packFileEntry.name.endsWith(".png")) {
+            dwBufferFlag.value = Encryption.Aes;
+          } else {
+            dwBufferFlag.value = Encryption.Aes | Encryption.Zlib;
+          }
 
-      //       // Make sure the entry has a parsed file header from load
-      //       if (pHeader == null) continue;
-
-      //       // Update the initial versioning before any future crypto calls
-      //       if (pHeader.GetVer() != uVer) uVer = pHeader.GetVer();
-
-      //       // Access the current encrypted block data from the memory map initially loaded
-      //       using (MemoryMappedViewStream pBuffer = pDataMappedMemFile.CreateViewStream((long) pHeader.GetOffset(), pHeader.GetEncodedFileSize())) {
-      //           byte[] pSrc = new byte[pHeader.GetEncodedFileSize()];
-
-      //           if (pBuffer.Read(pSrc, 0, (int) pHeader.GetEncodedFileSize()) != pHeader.GetEncodedFileSize()) continue;
-      //           // Modify the header's file index to the updated offset after entry changes
-      //           pHeader.SetFileIndex(nCurIndex);
-      //           // Modify the header's offset to the updated offset after entry changes
-      //           pHeader.SetOffset(uOffset);
-      //           // Write the original (completely encrypted) block of data to file
-      //           pWriter.Write(pSrc);
-
-      //           // Update the Entry's index to the new current index
-      //           pEntry.Index = nCurIndex;
-
-      //           nCurIndex++;
-      //           uOffset += pHeader.GetEncodedFileSize();
-      //       }
-
-      if (!header) {
-        // New pack file entry
-        // Hacky way of doing this, but this follows Nexon's current conventions.
-        let dwBufferFlag = new Encryption(0);
-        if (packFileEntry.name.endsWith(".usm")) {
-          dwBufferFlag.value = Encryption.Xor;
-        } else if (packFileEntry.name.endsWith(".png")) {
-          dwBufferFlag.value = Encryption.Aes;
+          switch (version) {
+            case PackVersion.MS2F:
+              header = PackFileHeaderVer1.createHeader(
+                index,
+                dwBufferFlag,
+                offset,
+                BinaryBuffer.fromBuffer(packFileEntry.data!.getBuffer())
+              );
+              break;
+            case PackVersion.NS2F:
+              header = PackFileHeaderVer2.createHeader(
+                index,
+                dwBufferFlag,
+                offset,
+                BinaryBuffer.fromBuffer(packFileEntry.data!.getBuffer())
+              );
+              break;
+            case PackVersion.OS2F:
+            case PackVersion.PS2F:
+              header = PackFileHeaderVer3.createHeader(
+                version,
+                index,
+                dwBufferFlag,
+                offset,
+                BinaryBuffer.fromBuffer(packFileEntry.data!.getBuffer())
+              );
+              break;
+            default:
+              header = PackFileHeaderVer1.createHeader(
+                index,
+                dwBufferFlag,
+                offset,
+                BinaryBuffer.fromBuffer(packFileEntry.data!.getBuffer())
+              );
+          }
+          packFileEntry.fileHeader = header;
         } else {
-          dwBufferFlag.value = Encryption.Aes | Encryption.Zlib;
+          // Existing pack file entry
+          header.fileIndex = index;
+          header.offset = offset;
         }
 
-        switch (version) {
-          case PackVersion.MS2F:
-            header = PackFileHeaderVer1.createHeader(
-              index,
-              dwBufferFlag,
-              BigInt(offset),
-              packFileEntry.data!
-            );
-            break;
-          // case PackVersion.NS2F:
-          //   header = PackFileHeaderVer2.createHeader(
-          //     index,
-          //     dwBufferFlag,
-          //     BigInt(offset),
-          //     packFileEntry.data!
-          //   );
-          //   break;
-          // case PackVersion.OS2F:
-          // case PackVersion.PS2F:
-          //   header = PackFileHeaderVer3.createHeader(
-          //     version,
-          //     index,
-          //     dwBufferFlag,
-          //     BigInt(offset),
-          //     packFileEntry.data!
-          //   );
-          //   break;
-          default:
-            header = PackFileHeaderVer1.createHeader(
-              index,
-              dwBufferFlag,
-              BigInt(offset),
-              packFileEntry.data!
-            );
-        }
-        packFileEntry.fileHeader = header;
-      } else {
-        // Existing pack file entry
-        header.fileIndex = index;
-        header.offset = offset;
+        const [encryptedData, size, compressedSize, encodedSize] =
+          CryptoManager.encrypt(
+            version,
+            packFileEntry.data!,
+            header.bufferFlag ?? new Encryption(0)
+          );
+        writeBuffer.writeBytes(encryptedData.getBuffer());
+        bufferSize += encryptedData.length;
+
+        header.fileSize = BigInt(size);
+        header.compressedFileSize = BigInt(compressedSize);
+        header.encodedFileSize = encodedSize;
+
+        packFileEntry.index = index;
+        index++;
+
+        offset += BigInt(header.encodedFileSize);
+        continue;
       }
 
-      const [encryptedData, size, compressedSize, encodedSize] =
-        CryptoManager.encrypt(
-          version,
-          packFileEntry.data!,
-          header.bufferFlag ?? new Encryption(0)
-        );
-      writeBuffer.writeBytes(encryptedData.getBuffer());
+      if (!header) {
+        return;
+      }
 
-      header.fileSize = BigInt(size);
-      header.compressedFileSize = BigInt(compressedSize);
-      header.encodedFileSize = encodedSize;
+      if (header.version && header.version !== version) {
+        version = header.version;
+      }
 
+      const readBuffer = new BinaryBuffer(header.encodedFileSize!);
+      this.dataBuffer.copy(
+        readBuffer.getBuffer(),
+        0,
+        Number(header.offset),
+        Number(header.offset) + header.encodedFileSize!
+      );
+
+      header.fileIndex = index;
+      header.offset = BigInt(offset);
+      writeBuffer.writeBytes(readBuffer.getBuffer());
+      bufferSize += readBuffer.length;
       packFileEntry.index = index;
-      index++;
 
-      offset += BigInt(header.encodedFileSize);
+      index++;
+      offset += BigInt(header.encodedFileSize!);
     }
 
-    fs.writeFileSync(this.filePath, writeBuffer.getBuffer());
+    const endBuffer = writeBuffer.getBuffer().slice(0, bufferSize);
+    fs.writeFileSync(this.filePath, endBuffer);
   }
 }

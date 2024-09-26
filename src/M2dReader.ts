@@ -8,14 +8,14 @@ import { CryptoManager } from "./crypto/CryptoManager";
 import { BinaryBuffer } from "./crypto/common/BinaryBuffer";
 
 export class M2dReader {
-  #fileBuffer: Buffer;
+  fileBuffer: Buffer;
   filePath: string;
 
   readonly files: PackFileEntry[];
 
   constructor(filePath: string) {
     this.filePath = filePath;
-    this.#fileBuffer = fs.readFileSync(filePath);
+    this.fileBuffer = fs.readFileSync(filePath);
 
     const headerPath = filePath.replace(".m2d", ".m2h");
     const headerBuffer = BinaryBuffer.fromBuffer(fs.readFileSync(headerPath));
@@ -46,7 +46,7 @@ export class M2dReader {
     const parser = new XMLParser();
     const data = CryptoManager.decryptData(
       entry.fileHeader,
-      BinaryBuffer.fromBuffer(this.#fileBuffer)
+      BinaryBuffer.fromBuffer(this.fileBuffer)
     ).getBuffer();
     return parser.parse(data);
   }
@@ -57,7 +57,7 @@ export class M2dReader {
     }
     return CryptoManager.decryptData(
       entry.fileHeader,
-      BinaryBuffer.fromBuffer(this.#fileBuffer)
+      BinaryBuffer.fromBuffer(this.fileBuffer)
     );
   }
 
@@ -67,7 +67,7 @@ export class M2dReader {
     }
     return CryptoManager.decryptData(
       entry.fileHeader,
-      BinaryBuffer.fromBuffer(this.#fileBuffer)
+      BinaryBuffer.fromBuffer(this.fileBuffer)
     )
       .getBuffer()
       .toString("utf8");

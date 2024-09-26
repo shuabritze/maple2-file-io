@@ -65,7 +65,7 @@ export class CryptoManager {
 
     const start = Number(pHeader.offset ?? 0n);
 
-    const src = data.slice(start, start + Number(pHeader.encodedFileSize));
+    const src = data.slice(start, start + pHeader.encodedFileSize);
 
     return this.decrypt(
       pHeader.version ?? PackVersion.MS2F,
