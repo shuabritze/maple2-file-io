@@ -28,7 +28,7 @@ export class PackFileEntry {
     this.changed = changed;
   }
 
-  createCopy(data: BinaryBuffer): PackFileEntry {
+  createCopy(data?: BinaryBuffer): PackFileEntry {
     return new PackFileEntry(
       this.index,
       this.hash,

@@ -27,7 +27,7 @@ export class M2dWriter {
 
   static fromReader(reader: M2dReader) {
     const writer = new M2dWriter(reader.filePath);
-    writer.files = reader.files;
+    writer.files = reader.files.map((entry) => entry.createCopy());
     writer.dataBuffer = Buffer.from(reader.fileBuffer);
 
     return writer;
