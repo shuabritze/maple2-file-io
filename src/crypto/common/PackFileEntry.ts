@@ -76,7 +76,7 @@ export class PackFileEntry {
       this.treeName,
       header,
       data ?? this.data,
-      false
+      this.changed
     );
   }
 
