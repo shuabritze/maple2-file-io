@@ -1,5 +1,9 @@
 import { IPackFileHeader } from "../stream/IPackFileHeader";
+import { PackFileHeaderVer1 } from "../stream/PackFileHeaderVer1";
+import { PackFileHeaderVer2 } from "../stream/PackFileHeaderVer2";
+import { PackFileHeaderVer3 } from "../stream/PackFileHeaderVer3";
 import { BinaryBuffer } from "./BinaryBuffer";
+import { PackVersion } from "./PackVersion";
 
 export class PackFileEntry {
   index: number;
@@ -29,14 +33,50 @@ export class PackFileEntry {
   }
 
   createCopy(data?: BinaryBuffer): PackFileEntry {
+    let header: IPackFileHeader;
+    switch (this.fileHeader?.version) {
+      case PackVersion.NS2F:
+        header = new PackFileHeaderVer2();
+        header.bufferFlag = this.fileHeader?.bufferFlag;
+        header.fileIndex = this.fileHeader?.fileIndex;
+        header.encodedFileSize = this.fileHeader?.encodedFileSize;
+        header.compressedFileSize = this.fileHeader?.compressedFileSize;
+        header.fileSize = this.fileHeader?.fileSize;
+        header.offset = this.fileHeader?.offset;
+        break;
+      case PackVersion.OS2F:
+      case PackVersion.PS2F:
+        header = new PackFileHeaderVer3(this.fileHeader?.version);
+        header.bufferFlag = this.fileHeader?.bufferFlag;
+        header.fileIndex = this.fileHeader?.fileIndex;
+        header.encodedFileSize = this.fileHeader?.encodedFileSize;
+        (header as PackFileHeaderVer3).reserved[0] = 0;
+        header.compressedFileSize = this.fileHeader?.compressedFileSize;
+        header.fileSize = this.fileHeader?.fileSize;
+        header.offset = this.fileHeader?.offset;
+        break;
+      case PackVersion.MS2F:
+      default:
+        header = new PackFileHeaderVer1();
+        (header as PackFileHeaderVer1).packingDef = 0;
+        (header as PackFileHeaderVer1).reserved = [0, 0];
+        header.fileIndex = this.fileHeader?.fileIndex;
+        header.bufferFlag = this.fileHeader?.bufferFlag;
+        header.offset = this.fileHeader?.offset;
+        header.encodedFileSize = this.fileHeader?.encodedFileSize;
+        header.compressedFileSize = this.fileHeader?.compressedFileSize;
+        header.fileSize = this.fileHeader?.fileSize;
+        break
+    }
+
     return new PackFileEntry(
       this.index,
       this.hash,
       this.name,
       this.treeName,
-      null,
+      header,
       data ?? this.data,
-      true
+      false
     );
   }
 

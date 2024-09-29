@@ -27,7 +27,7 @@ export class PackFileHeaderVer3 implements IPackFileHeader {
     this.bufferFlag = new Encryption(reader.readUInt32LE());
     this.fileIndex = reader.readInt32LE();
     this.encodedFileSize = reader.readUInt32LE();
-    this.reserved[1] = reader.readInt32LE();
+    this.reserved[0] = reader.readInt32LE();
     this.compressedFileSize = reader.readBigInt64LE();
     this.fileSize = reader.readBigInt64LE();
     this.offset = reader.readBigInt64LE();
