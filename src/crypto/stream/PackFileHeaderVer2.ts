@@ -5,7 +5,7 @@ import { CryptoManager } from "../CryptoManager";
 import { IPackFileHeader } from "./IPackFileHeader";
 
 export class PackFileHeaderVer2 implements IPackFileHeader {
-  version: PackVersion = PackVersion.MS2F;
+  version: PackVersion = PackVersion.NS2F;
   bufferFlag?: Encryption;
   fileIndex?: number;
   offset?: bigint;

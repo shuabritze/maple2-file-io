@@ -6,10 +6,12 @@ import { PackFileEntry } from "./crypto/common/PackFileEntry";
 import { IPackStream } from "./crypto/stream/IPackStream";
 import { CryptoManager } from "./crypto/CryptoManager";
 import { BinaryBuffer } from "./crypto/common/BinaryBuffer";
+import { PackVersion } from "./crypto/common/PackVersion";
 
 export class M2dReader {
   fileBuffer: Buffer;
   filePath: string;
+  packVersion: PackVersion;
 
   readonly files: PackFileEntry[];
 
@@ -20,6 +22,7 @@ export class M2dReader {
     const headerPath = filePath.replace(".m2d", ".m2h");
     const headerBuffer = BinaryBuffer.fromBuffer(fs.readFileSync(headerPath));
     const stream = IPackStream.createStream(headerBuffer);
+    this.packVersion = stream.version;
 
     // get fileString as a string
     const stringBytes = CryptoManager.decryptFileString(stream, headerBuffer);

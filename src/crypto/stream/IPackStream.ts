@@ -7,6 +7,7 @@ import { PackStreamVer3 } from "./PackStreamVer3";
 
 export class IPackStream {
   version?: PackVersion;
+  requiredBufferSpace?: number;
   compressedHeaderSize?: bigint;
   encodedHeaderSize?: bigint;
   headerSize?: bigint;
@@ -40,7 +41,6 @@ export class IPackStream {
       case PackVersion.NS2F:
         return PackStreamVer2.parseHeader(pHeader);
       case PackVersion.OS2F:
-        return PackStreamVer3.parseHeader(pHeader, version);
       case PackVersion.PS2F:
         return PackStreamVer3.parseHeader(pHeader, version);
       default:

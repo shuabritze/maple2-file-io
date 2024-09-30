@@ -6,6 +6,8 @@ import { PackFileHeaderVer2 } from "./PackFileHeaderVer2";
 
 export class PackStreamVer2 implements IPackStream {
   version: PackVersion = PackVersion.NS2F;
+  requiredBufferSpace: number = 52; 
+
   compressedHeaderSize: bigint = 0n;
   encodedHeaderSize: bigint = 0n;
   headerSize: bigint = 0n;
@@ -20,8 +22,8 @@ export class PackStreamVer2 implements IPackStream {
     stream.fileListCount = BigInt(reader.readUInt32LE());
     stream.compressedDataSize = reader.readBigInt64LE();
     stream.encodedDataSize = reader.readBigInt64LE();
-    stream.compressedHeaderSize = reader.readBigInt64LE();
     stream.headerSize = reader.readBigInt64LE();
+    stream.compressedHeaderSize = reader.readBigInt64LE();
     stream.encodedHeaderSize = reader.readBigInt64LE();
     stream.dataSize = reader.readBigInt64LE();
 

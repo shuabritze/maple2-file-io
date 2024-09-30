@@ -7,6 +7,7 @@ import { PackFileHeaderVer3 } from "./PackFileHeaderVer3";
 export class PackStreamVer3 implements IPackStream {
   // OS2F/PS2F
   version: PackVersion;
+  requiredBufferSpace: number = 56;
 
   compressedHeaderSize: bigint = 0n;
   encodedHeaderSize: bigint = 0n;

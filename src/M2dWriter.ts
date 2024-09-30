@@ -10,6 +10,9 @@ import fs from "fs";
 import { M2dReader } from "./M2dReader";
 import { PackFileHeaderVer2 } from "./crypto/stream/PackFileHeaderVer2";
 import { PackFileHeaderVer3 } from "./crypto/stream/PackFileHeaderVer3";
+import { PackStreamVer2 } from "./crypto/stream/PackStreamVer2";
+import { PackStreamVer3 } from "./crypto/stream/PackStreamVer3";
+import { IPackStream } from "./crypto/stream/IPackStream";
 
 export class M2dWriter {
   /**
@@ -18,10 +21,12 @@ export class M2dWriter {
   filePath: string;
   dataBuffer: Buffer;
   files: PackFileEntry[];
+  packVersion: PackVersion;
 
-  constructor(filePath: string) {
+  constructor(filePath: string, packVersion: PackVersion = PackVersion.MS2F) {
     this.filePath = filePath;
     this.dataBuffer = Buffer.alloc(0);
+    this.packVersion = packVersion;
     this.files = [];
   }
 
@@ -29,6 +34,7 @@ export class M2dWriter {
     const writer = new M2dWriter(reader.filePath);
     writer.files = reader.files.map((entry) => entry.createCopy());
     writer.dataBuffer = Buffer.from(reader.fileBuffer);
+    writer.packVersion = reader.packVersion;
 
     return writer;
   }
@@ -60,7 +66,7 @@ export class M2dWriter {
       headerCompressedLength,
       encodedHeaderLength,
     ] = CryptoManager.encrypt(
-      PackVersion.MS2F,
+      this.packVersion,
       fileStringBuffer,
       new Encryption(Encryption.Aes | Encryption.Zlib)
     );
@@ -76,12 +82,26 @@ export class M2dWriter {
       fileTableCompressedLength,
       encodedFileTableLength,
     ] = CryptoManager.encrypt(
-      PackVersion.MS2F,
+      this.packVersion,
       fileBuffer,
       new Encryption(Encryption.Aes | Encryption.Zlib)
     );
 
-    const stream = new PackStreamVer1();
+    let stream: IPackStream;
+    switch (this.packVersion) {
+      case PackVersion.MS2F:
+        stream = new PackStreamVer1();
+        break;
+      case PackVersion.NS2F:
+        stream = new PackStreamVer2();
+        break;
+      case PackVersion.OS2F:
+      case PackVersion.PS2F:
+        stream = new PackStreamVer3(this.packVersion);
+        break;
+      default:
+        throw new Error(`Invalid PackVersion:${this.packVersion}`);
+    }
     stream.fileListCount = BigInt(fileCount);
     stream.headerSize = BigInt(headerLength);
     stream.compressedHeaderSize = BigInt(headerCompressedLength);
@@ -90,14 +110,14 @@ export class M2dWriter {
     stream.compressedDataSize = BigInt(fileTableCompressedLength);
     stream.encodedDataSize = BigInt(encodedFileTableLength);
 
-    const streamBuffer = new BinaryBuffer(60);
+    const streamBuffer = new BinaryBuffer(stream.requiredBufferSpace ?? 60);
     stream.encode(streamBuffer);
 
     const fileStream = fs.createWriteStream(
       this.filePath.replace(".m2d", ".m2h")
     );
     const verBuffer = new BinaryBuffer(4);
-    verBuffer.writeUInt32LE(stream.version);
+    verBuffer.writeUInt32LE(stream.version!);
     fileStream.write(verBuffer.getBuffer());
     fileStream.write(streamBuffer.getBuffer());
     fileStream.write(encryptedHeaderBuffer.getBuffer());
