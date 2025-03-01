@@ -9,7 +9,7 @@ import { BinaryBuffer } from "./crypto/common/BinaryBuffer";
 import { PackVersion } from "./crypto/common/PackVersion";
 
 export class M2dReader {
-  fileBuffer: Buffer;
+  fileDescriptor: number;
   filePath: string;
   packVersion: PackVersion;
 
@@ -17,7 +17,12 @@ export class M2dReader {
 
   constructor(filePath: string) {
     this.filePath = filePath;
-    this.fileBuffer = fs.readFileSync(filePath);
+    const fileSize = fs.statSync(filePath).size;
+    if (!filePath.endsWith(".m2d")) {
+      throw new Error("ERROR: File is not a .m2d file.");
+    }
+
+    this.fileDescriptor = fs.openSync(filePath, "r+");
 
     const headerPath = filePath.replace(".m2d", ".m2h");
     const headerBuffer = BinaryBuffer.fromBuffer(fs.readFileSync(headerPath));
@@ -46,10 +51,15 @@ export class M2dReader {
     if (!entry.fileHeader) {
       throw new Error("ERROR: File header is null.");
     }
+
+    if (!this.fileDescriptor) {
+      return null;
+    }
+
     const parser = new XMLParser();
     const data = CryptoManager.decryptData(
       entry.fileHeader,
-      BinaryBuffer.fromBuffer(this.fileBuffer)
+      this.fileDescriptor
     ).getBuffer();
     return parser.parse(data);
   }
@@ -58,20 +68,24 @@ export class M2dReader {
     if (!entry.fileHeader) {
       throw new Error("ERROR: File header is null.");
     }
-    return CryptoManager.decryptData(
-      entry.fileHeader,
-      BinaryBuffer.fromBuffer(this.fileBuffer)
-    );
+
+    if (!this.fileDescriptor) {
+      return null;
+    }
+
+    return CryptoManager.decryptData(entry.fileHeader, this.fileDescriptor);
   }
 
   getString(entry: PackFileEntry) {
     if (!entry.fileHeader) {
       throw new Error("ERROR: File header is null.");
     }
-    return CryptoManager.decryptData(
-      entry.fileHeader,
-      BinaryBuffer.fromBuffer(this.fileBuffer)
-    )
+
+    if (!this.fileDescriptor) {
+      return null;
+    }
+
+    return CryptoManager.decryptData(entry.fileHeader, this.fileDescriptor)
       .getBuffer()
       .toString("utf8");
   }

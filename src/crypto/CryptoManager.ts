@@ -1,5 +1,5 @@
 import zlib from "zlib";
-import crypto from "crypto";
+import fs from "fs";
 
 import { Encryption } from "./common/Encryption";
 import { PackVersion } from "./common/PackVersion";
@@ -52,7 +52,7 @@ export class CryptoManager {
     );
   }
 
-  static decryptData(pHeader: IPackFileHeader, data: BinaryBuffer) {
+  static decryptData(pHeader: IPackFileHeader, fd: number) {
     if (
       !pHeader.compressedFileSize ||
       !pHeader.encodedFileSize ||
@@ -65,14 +65,15 @@ export class CryptoManager {
 
     const start = Number(pHeader.offset ?? 0n);
 
-    const src = data.slice(start, start + pHeader.encodedFileSize);
+    const src = Buffer.alloc(pHeader.encodedFileSize);
+    fs.readSync(fd, src, 0, pHeader.encodedFileSize, start);
 
     return this.decrypt(
       pHeader.version ?? PackVersion.MS2F,
       pHeader.encodedFileSize,
       Number(pHeader.compressedFileSize),
       pHeader.bufferFlag ?? new Encryption(0),
-      src
+      BinaryBuffer.fromBuffer(src)
     );
   }
 

@@ -32,7 +32,7 @@ export class PackFileEntry {
     this.changed = changed;
   }
 
-  createCopy(data?: BinaryBuffer): PackFileEntry {
+  createCopy(data?: BinaryBuffer | null): PackFileEntry {
     let header: IPackFileHeader;
     switch (this.fileHeader?.version) {
       case PackVersion.NS2F:

@@ -19,13 +19,12 @@ export class M2dWriter {
    * Path to .m2d
    */
   filePath: string;
-  dataBuffer: Buffer;
+  originalFilePath?: string;
   files: PackFileEntry[];
   packVersion: PackVersion;
 
   constructor(filePath: string, packVersion: PackVersion = PackVersion.MS2F) {
     this.filePath = filePath;
-    this.dataBuffer = Buffer.alloc(0);
     this.packVersion = packVersion;
     this.files = [];
   }
@@ -33,8 +32,8 @@ export class M2dWriter {
   static fromReader(reader: M2dReader) {
     const writer = new M2dWriter(reader.filePath);
     writer.files = reader.files.map((entry) => entry.createCopy());
-    writer.dataBuffer = Buffer.from(reader.fileBuffer);
     writer.packVersion = reader.packVersion;
+    writer.originalFilePath = reader.filePath;
 
     return writer;
   }
@@ -48,6 +47,12 @@ export class M2dWriter {
   }
 
   save() {
+    if (!this.originalFilePath) {
+      // assume this is a new file
+      fs.writeFileSync(this.filePath, Buffer.alloc(0));
+      this.originalFilePath = this.filePath;
+    }
+
     this.files.sort((a, b) => a.compareTo(b));
     this.#writeData();
     this.#writeHeader();
@@ -131,13 +136,16 @@ export class M2dWriter {
     let index = 1;
 
     // Allocate space for each new entry & the original data buffer
+    const originalFileSize = fs.statSync(this.originalFilePath!).size;
     const sizeTotal =
       this.files
         .filter((file) => file.changed)
         .reduce((acc, cur) => {
           return acc + (cur.data?.length ?? 0) + 48;
-        }, 0) + this.dataBuffer.length;
+        }, 0) + originalFileSize;
     const writeBuffer = new BinaryBuffer(sizeTotal);
+
+    const fd = fs.openSync(this.originalFilePath!, "r");
 
     let bufferSize = 0;
     for (const packFileEntry of this.files) {
@@ -227,12 +235,7 @@ export class M2dWriter {
       }
 
       const readBuffer = new BinaryBuffer(header.encodedFileSize!);
-      this.dataBuffer.copy(
-        readBuffer.getBuffer(),
-        0,
-        Number(header.offset),
-        Number(header.offset) + header.encodedFileSize!
-      );
+      fs.readSync(fd, readBuffer.getBuffer(), 0, header.encodedFileSize!, Number(header.offset));
 
       header.fileIndex = index;
       header.offset = BigInt(offset);
@@ -244,7 +247,7 @@ export class M2dWriter {
       offset += BigInt(header.encodedFileSize!);
     }
 
-    const endBuffer = writeBuffer.getBuffer().slice(0, bufferSize);
-    fs.writeFileSync(this.filePath, endBuffer);
+    fs.closeSync(fd);
+    fs.writeFileSync(this.filePath, writeBuffer.getBuffer().slice(0, bufferSize));
   }
 }
