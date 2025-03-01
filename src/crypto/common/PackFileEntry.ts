@@ -92,6 +92,12 @@ export class PackFileEntry {
       : `${this.index},${this.hash},${this.name}\r\n`;
   }
 
+  setData(data: Buffer | string) {
+    const asBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    this.data = BinaryBuffer.fromBuffer(asBuffer);
+    this.changed = true;
+  }
+
   static createFileList(fileString: string): PackFileEntry[] {
     const fileList: PackFileEntry[] = [];
 

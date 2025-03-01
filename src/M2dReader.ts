@@ -85,8 +85,15 @@ export class M2dReader {
       return null;
     }
 
-    return CryptoManager.decryptData(entry.fileHeader, this.fileDescriptor)
-      .getBuffer()
-      .toString("utf8");
+    const data = CryptoManager.decryptData(entry.fileHeader, this.fileDescriptor).getBuffer();
+
+    let decoder = new TextDecoder("utf-8");
+    let text = decoder.decode(data);
+    if (text.includes('encoding="euc-kr"')) {
+      decoder = new TextDecoder("euc-kr");
+      text = decoder.decode(data);
+    }
+
+    return text;
   }
 }
