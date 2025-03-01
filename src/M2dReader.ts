@@ -22,7 +22,7 @@ export class M2dReader {
       throw new Error("ERROR: File is not a .m2d file.");
     }
 
-    this.fileDescriptor = fs.openSync(filePath, "r+");
+    this.fileDescriptor = fs.openSync(filePath, "r");
 
     const headerPath = filePath.replace(".m2d", ".m2h");
     const headerBuffer = BinaryBuffer.fromBuffer(fs.readFileSync(headerPath));
